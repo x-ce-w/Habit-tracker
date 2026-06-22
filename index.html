@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ritual — a simple habit tracker</title>
+<meta name="description" content="Tick off your daily habits, build streaks, and watch your consistency." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14151A;
+    --surface: #1C1E26;
+    --surface-2: #232631;
+    --ink: #ECECEF;
+    --muted: #898C9A;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --ember: #FF7A45;
+    --ember-glow: #FFB347;
+    --ember-soft: rgba(255, 122, 69, 0.14);
+    --cool: #7CB2D1;
+    --cool-soft: rgba(124, 178, 209, 0.12);
+    --good: #5DD39E;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1d2030 0%, var(--bg) 55%) no-repeat;
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+
+  /* ---- Header ---- */
+  header { margin-bottom: 32px; }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+    font-weight: 500;
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(34px, 8vw, 46px);
+    line-height: 1.0;
+    margin: 0 0 18px;
+    letter-spacing: -0.01em;
+  }
+
+  .today-bar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .today-bar .date { color: var(--muted); font-size: 14px; }
+  .today-bar .count {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .today-bar .count b { color: var(--ember); font-weight: 600; }
+
+  /* ---- Habit card ---- */
+  .habit {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "check name del"
+      "check strip strip";
+    align-items: center;
+    gap: 4px 16px;
+    padding: 18px;
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color 0.2s ease, transform 0.06s ease;
+  }
+  .habit.done { border-color: rgba(255, 122, 69, 0.35); }
+
+  .toggle {
+    grid-area: check;
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    border: 2px solid var(--line-strong);
+    background: transparent;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+  }
+  .toggle:hover { border-color: var(--ember); }
+  .toggle svg { width: 16px; height: 16px; opacity: 0; transform: scale(0.6); transition: all 0.18s ease; }
+  .habit.done .toggle {
+    background: linear-gradient(150deg, var(--ember-glow), var(--ember));
+    border-color: transparent;
+  }
+  .habit.done .toggle svg { opacity: 1; transform: scale(1); }
+
+  .name-block { grid-area: name; min-width: 0; }
+  .name {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .metric {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .metric .big {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .metric.streak .big { color: var(--ember); }
+  .metric.pct .big { color: var(--cool); }
+  .metric .flame { font-size: 13px; }
+  .metric .sub { font-size: 12px; opacity: 0.85; }
+
+  .del {
+    grid-area: del;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px;
+    border-radius: 8px;
+    opacity: 0.4;
+    transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .habit:hover .del, .habit:focus-within .del, .del:focus-visible { opacity: 1; }
+  .del:hover { color: var(--ember); background: var(--ember-soft); }
+
+  /* ---- 14-day ember strip (the signature) ---- */
+  .strip {
+    grid-area: strip;
+    display: flex;
+    gap: 4px;
+    margin-top: 12px;
+  }
+  .cell {
+    flex: 1;
+    height: 7px;
+    border-radius: 3px;
+    background: var(--surface-2);
+  }
+  .cell.inactive { background: rgba(255, 255, 255, 0.03); }
+  .cell.miss { background: var(--surface-2); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
+  .cell.done { background: rgba(255, 122, 69, 0.4); }
+  .cell.streak { background: linear-gradient(180deg, var(--ember-glow), var(--ember)); box-shadow: 0 0 8px rgba(255, 122, 69, 0.35); }
+  .cell.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--line-strong); }
+  .cell.today.streak { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ember), 0 0 8px rgba(255,122,69,0.4); }
+
+  /* ---- Add habit ---- */
+  .add {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .add input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 13px 16px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 15px;
+  }
+  .add input::placeholder { color: var(--muted); }
+  .add input:focus { outline: none; border-color: var(--ember); }
+  .add button {
+    background: var(--ember-soft);
+    color: var(--ember);
+    border: 1px solid rgba(255, 122, 69, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 0 20px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+  }
+  .add button:hover { background: rgba(255, 122, 69, 0.22); }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 20px;
+    font-size: 15px;
+  }
+
+  .data-tools {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 28px;
+  }
+  .ghost {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: var(--radius-sm);
+    padding: 9px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .ghost:hover { border-color: var(--line-strong); color: var(--ink); }
+
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  footer a { color: var(--muted); }
+
+  :focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; border-radius: 4px; }
+
+  @media (max-width: 420px) {
+    .wrap { padding: 32px 14px 60px; }
+    .habit { padding: 16px; gap: 4px 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Day by day</p>
+      <h1>Ritual</h1>
+      <div class="today-bar">
+        <span class="date" id="todayDate"></span>
+        <span class="count" id="todayCount"></span>
+      </div>
+    </header>
+
+    <main id="list"></main>
+
+    <div class="add">
+      <input id="newHabit" type="text" placeholder="Add a habit…" maxlength="60" aria-label="New habit name" />
+      <button id="addBtn">Add</button>
+    </div>
+
+    <div class="data-tools">
+      <button id="exportBtn" class="ghost">Export backup</button>
+      <button id="importBtn" class="ghost">Import backup</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden />
+    </div>
+
+    <footer>
+      Your habits are saved on this device, in this browser. Export a backup to keep them safe or move them elsewhere.
+    </footer>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "ritual.habits.v1";
+  var STRIP_DAYS = 14;
+
+  // ---------- Date helpers (all local time, midnight) ----------
+  function ymd(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+  function parseYmd(s) {
+    var p = s.split("-");
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  function startOfToday() {
+    var n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }
+  function addDays(d, n) {
+    var c = new Date(d);
+    c.setDate(c.getDate() + n);
+    return c;
+  }
+
+  // ---------- State ----------
+  var habits = load();
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        var n = normalize(parsed.habits);
+        if (n) return n;
+      }
+    } catch (e) {}
+    // Seed a few basics on first run, all starting today.
+    var t = ymd(startOfToday());
+    return [
+      { id: id(), name: "Drink water", start: t, done: [] },
+      { id: id(), name: "Move your body", start: t, done: [] },
+      { id: id(), name: "Read", start: t, done: [] },
+      { id: id(), name: "No phone in bed", start: t, done: [] }
+    ];
+  }
+
+  // Clean and validate a list of habits. Guarantees each habit's `done`
+  // contains each date at most once — a habit can only be logged once per day.
+  function normalize(arr) {
+    if (!Array.isArray(arr)) return null;
+    var dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    return arr.map(function (h) {
+      if (!h || typeof h.name !== "string") return null;
+      var name = h.name.trim().slice(0, 60);
+      if (!name) return null;
+      var start = (typeof h.start === "string" && dateRe.test(h.start)) ? h.start : ymd(startOfToday());
+      var done = Array.isArray(h.done)
+        ? h.done.filter(function (s) { return typeof s === "string" && dateRe.test(s); })
+        : [];
+      done = Array.from(new Set(done)).sort(); // de-duplicate -> one log per day
+      return {
+        id: (typeof h.id === "string" && h.id) ? h.id : id(),
+        name: name,
+        start: start,
+        done: done
+      };
+    }).filter(Boolean);
+  }
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ habits: habits }));
+    } catch (e) {}
+  }
+  function id() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  // ---------- Core logic ----------
+
+  // Current streak = consecutive completed days ending today (or yesterday
+  // if today isn't ticked yet — the day isn't over, so it doesn't break it).
+  function streakOf(h) {
+    var doneSet = new Set(h.done);
+    var cursor = startOfToday();
+    if (!doneSet.has(ymd(cursor))) cursor = addDays(cursor, -1);
+    var dates = new Set();
+    while (doneSet.has(ymd(cursor))) {
+      dates.add(ymd(cursor));
+      cursor = addDays(cursor, -1);
+    }
+    return { count: dates.size, set: dates };
+  }
+
+  // Broken = any fully-elapsed day (start .. yesterday) was missed.
+  // Today is never counted as a miss, because the day isn't over yet.
+  function isBroken(h) {
+    var doneSet = new Set(h.done);
+    var today = startOfToday();
+    var cursor = parseYmd(h.start);
+    while (cursor < today) {
+      if (!doneSet.has(ymd(cursor))) return true;
+      cursor = addDays(cursor, 1);
+    }
+    return false;
+  }
+
+  // Consistency % since the habit began.
+  // Denominator = every day that has had a fair chance: all past days,
+  // plus today only once it's been completed.
+  function consistencyOf(h) {
+    var doneSet = new Set(h.done);
+    var today = startOfToday();
+    var cursor = parseYmd(h.start);
+    var judged = 0, completed = 0;
+    while (cursor <= today) {
+      var key = ymd(cursor);
+      var done = doneSet.has(key);
+      var isToday = +cursor === +today;
+      if (!isToday || done) {
+        judged++;
+        if (done) completed++;
+      }
+      cursor = addDays(cursor, 1);
+    }
+    if (judged === 0) return null; // brand new, started today, nothing to judge
+    return Math.round((completed / judged) * 100);
+  }
+
+  function toggleToday(h) {
+    var t = ymd(startOfToday());
+    var i = h.done.indexOf(t);
+    if (i === -1) h.done.push(t);
+    else h.done.splice(i, 1);
+    save();
+    render();
+  }
+
+  // ---------- Rendering ----------
+  var list = document.getElementById("list");
+  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#14151A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+
+  function render() {
+    renderToday();
+    list.innerHTML = "";
+
+    if (habits.length === 0) {
+      var e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "No habits yet. Add one below to begin.";
+      list.appendChild(e);
+      return;
+    }
+
+    habits.forEach(function (h) {
+      var todayKey = ymd(startOfToday());
+      var doneToday = h.done.indexOf(todayKey) !== -1;
+      var streak = streakOf(h);
+      var broken = isBroken(h);
+
+      var card = document.createElement("div");
+      card.className = "habit" + (doneToday ? " done" : "");
+
+      // Toggle
+      var btn = document.createElement("button");
+      btn.className = "toggle";
+      btn.setAttribute("aria-pressed", doneToday ? "true" : "false");
+      btn.setAttribute("aria-label", (doneToday ? "Mark not done: " : "Mark done: ") + h.name);
+      btn.innerHTML = CHECK;
+      btn.addEventListener("click", function () { toggleToday(h); });
+      card.appendChild(btn);
+
+      // Name + metric
+      var nameBlock = document.createElement("div");
+      nameBlock.className = "name-block";
+      var name = document.createElement("p");
+      name.className = "name";
+      name.textContent = h.name;
+      nameBlock.appendChild(name);
+      nameBlock.appendChild(metricEl(h, streak, broken));
+      card.appendChild(nameBlock);
+
+      // Delete
+      var del = document.createElement("button");
+      del.className = "del";
+      del.innerHTML = "&times;";
+      del.setAttribute("aria-label", "Remove " + h.name);
+      del.addEventListener("click", function () {
+        if (confirm('Remove "' + h.name + '"? Its history will be lost.')) {
+          habits = habits.filter(function (x) { return x.id !== h.id; });
+          save();
+          render();
+        }
+      });
+      card.appendChild(del);
+
+      // Strip
+      card.appendChild(stripEl(h, streak.set));
+
+      list.appendChild(card);
+    });
+  }
+
+  function metricEl(h, streak, broken) {
+    var m = document.createElement("div");
+    m.className = "metric";
+
+    if (!broken) {
+      m.classList.add("streak");
+      if (streak.count >= 1) {
+        m.innerHTML =
+          '<span class="flame">🔥</span>' +
+          '<span class="big">' + streak.count + '</span>' +
+          '<span>day' + (streak.count === 1 ? "" : "s") + ' streak</span>';
+      } else {
+        m.innerHTML = '<span>Tick it off to start your streak</span>';
+      }
+    } else {
+      m.classList.add("pct");
+      var pct = consistencyOf(h);
+      var html = '<span class="big">' + pct + '%</span><span>consistency</span>';
+      if (streak.count >= 1) {
+        html += '<span class="sub">· 🔥 ' + streak.count + ' now</span>';
+      }
+      m.innerHTML = html;
+    }
+    return m;
+  }
+
+  function stripEl(h, streakSet) {
+    var wrap = document.createElement("div");
+    wrap.className = "strip";
+    wrap.setAttribute("aria-hidden", "true");
+    var doneSet = new Set(h.done);
+    var today = startOfToday();
+    var start = parseYmd(h.start);
+
+    for (var i = STRIP_DAYS - 1; i >= 0; i--) {
+      var day = addDays(today, -i);
+      var key = ymd(day);
+      var cell = document.createElement("span");
+      cell.className = "cell";
+
+      if (day < start) {
+        cell.className += " inactive";
+      } else if (doneSet.has(key)) {
+        cell.className += streakSet.has(key) ? " streak" : " done";
+      } else {
+        cell.className += " miss";
+      }
+      if (+day === +today) cell.className += " today";
+      wrap.appendChild(cell);
+    }
+    return wrap;
+  }
+
+  function renderToday() {
+    var d = new Date();
+    document.getElementById("todayDate").textContent =
+      d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    var t = ymd(startOfToday());
+    var done = habits.filter(function (h) { return h.done.indexOf(t) !== -1; }).length;
+    document.getElementById("todayCount").innerHTML =
+      "<b>" + done + "</b> / " + habits.length + " today";
+  }
+
+  // ---------- Add habit ----------
+  var input = document.getElementById("newHabit");
+  function addHabit() {
+    var name = input.value.trim();
+    if (!name) return;
+    habits.push({ id: id(), name: name, start: ymd(startOfToday()), done: [] });
+    input.value = "";
+    save();
+    render();
+    input.focus();
+  }
+  document.getElementById("addBtn").addEventListener("click", addHabit);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") addHabit();
+  });
+
+  // ---------- Export / Import ----------
+  function downloadJSON(filename, text) {
+    var blob = new Blob([text], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    var payload = JSON.stringify(
+      { version: 1, exportedAt: new Date().toISOString(), habits: habits },
+      null, 2
+    );
+    downloadJSON("ritual-habits-" + ymd(startOfToday()) + ".json", payload);
+  });
+
+  var importFile = document.getElementById("importFile");
+  document.getElementById("importBtn").addEventListener("click", function () {
+    importFile.click();
+  });
+  importFile.addEventListener("change", function () {
+    var file = importFile.files && importFile.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        // Accept either { habits: [...] } or a bare array.
+        var incoming = normalize(data && data.habits ? data.habits : data);
+        if (!incoming || incoming.length === 0) {
+          alert("That file doesn't contain any habits to import.");
+          return;
+        }
+        var msg = "Import " + incoming.length + " habit" +
+          (incoming.length === 1 ? "" : "s") +
+          "? This replaces the habits currently on this device.";
+        if (!confirm(msg)) return;
+        habits = incoming;
+        save();
+        render();
+      } catch (e) {
+        alert("Couldn't read that file — it doesn't look like a Ritual backup.");
+      } finally {
+        importFile.value = ""; // let the same file be re-imported later
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
