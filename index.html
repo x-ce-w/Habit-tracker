@@ -221,6 +221,17 @@
     white-space: nowrap;
   }
   .add button:hover { background: rgba(255, 122, 69, 0.22); }
+  .add button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .limit-note {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: center;
+  }
 
   .empty {
     text-align: center;
@@ -259,6 +270,24 @@
 
   :focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; border-radius: 4px; }
 
+  /* ---- Editable name ---- */
+  .name {
+    cursor: text;
+    border-radius: 6px;
+    padding: 1px 4px;
+    margin-left: -4px;
+    transition: background 0.15s ease;
+  }
+  .name:hover { background: rgba(255, 255, 255, 0.05); }
+  .name:focus {
+    outline: none;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--line-strong);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
+  }
+
   @media (max-width: 420px) {
     .wrap { padding: 32px 14px 60px; }
     .habit { padding: 16px; gap: 4px 12px; }
@@ -286,6 +315,7 @@
       <input id="newHabit" type="text" placeholder="Add a habit…" maxlength="60" aria-label="New habit name" />
       <button id="addBtn">Add</button>
     </div>
+    <p class="limit-note" id="limitNote"></p>
 
     <div class="data-tools">
       <button id="exportBtn" class="ghost">Export backup</button>
@@ -304,6 +334,7 @@
 
   var STORAGE_KEY = "ritual.habits.v1";
   var STRIP_DAYS = 14;
+  var MAX_HABITS = 5;
 
   // ---------- Date helpers (all local time, midnight) ----------
   function ymd(d) {
@@ -335,7 +366,7 @@
       if (raw) {
         var parsed = JSON.parse(raw);
         var n = normalize(parsed.habits);
-        if (n) return n;
+        if (n) return n.slice(0, MAX_HABITS);
       }
     } catch (e) {}
     // Seed a few basics on first run, all starting today.
@@ -439,12 +470,20 @@
     render();
   }
 
+  function renameHabit(h, newName) {
+    var clean = newName.trim().slice(0, 60);
+    if (!clean) clean = h.name; // never allow it to go blank
+    h.name = clean;
+    save();
+  }
+
   // ---------- Rendering ----------
   var list = document.getElementById("list");
   var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#14151A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
   function render() {
     renderToday();
+    renderAddState();
     list.innerHTML = "";
 
     if (habits.length === 0) {
@@ -479,6 +518,30 @@
       var name = document.createElement("p");
       name.className = "name";
       name.textContent = h.name;
+      name.setAttribute("contenteditable", "true");
+      name.setAttribute("spellcheck", "false");
+      name.setAttribute("role", "textbox");
+      name.setAttribute("aria-label", "Edit habit name");
+      name.setAttribute("title", "Click to rename");
+
+      function commit() {
+        renameHabit(h, name.textContent);
+        name.textContent = h.name; // re-sync (handles blank/trim cases)
+      }
+      name.addEventListener("blur", commit);
+      name.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          name.blur();
+        } else if (ev.key === "Escape") {
+          ev.preventDefault();
+          name.textContent = h.name; // discard edits
+          name.blur();
+        }
+      });
+      // Don't let clicking into the name also toggle the habit via bubbling.
+      name.addEventListener("click", function (ev) { ev.stopPropagation(); });
+
       nameBlock.appendChild(name);
       nameBlock.appendChild(metricEl(h, streak, broken));
       card.appendChild(nameBlock);
@@ -567,9 +630,20 @@
       "<b>" + done + "</b> / " + habits.length + " today";
   }
 
+  function renderAddState() {
+    var atLimit = habits.length >= MAX_HABITS;
+    input.disabled = atLimit;
+    addBtn.disabled = atLimit;
+    input.placeholder = atLimit ? "Habit limit reached" : "Add a habit…";
+    document.getElementById("limitNote").textContent =
+      atLimit ? "You've reached the " + MAX_HABITS + "-habit limit. Remove one to add another." : "";
+  }
+
   // ---------- Add habit ----------
   var input = document.getElementById("newHabit");
+  var addBtn = document.getElementById("addBtn");
   function addHabit() {
+    if (habits.length >= MAX_HABITS) return;
     var name = input.value.trim();
     if (!name) return;
     habits.push({ id: id(), name: name, start: ymd(startOfToday()), done: [] });
@@ -578,7 +652,7 @@
     render();
     input.focus();
   }
-  document.getElementById("addBtn").addEventListener("click", addHabit);
+  addBtn.addEventListener("click", addHabit);
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter") addHabit();
   });
@@ -620,6 +694,9 @@
         if (!incoming || incoming.length === 0) {
           alert("That file doesn't contain any habits to import.");
           return;
+        }
+        if (incoming.length > MAX_HABITS) {
+          incoming = incoming.slice(0, MAX_HABITS);
         }
         var msg = "Import " + incoming.length + " habit" +
           (incoming.length === 1 ? "" : "s") +
