@@ -49,7 +49,7 @@
   }
 
   /* ---- Header ---- */
-  header { margin-bottom: 32px; }
+  header { margin-bottom: 32px; position: relative; }
 
   .eyebrow {
     font-size: 12px;
@@ -60,6 +60,13 @@
     font-weight: 500;
   }
 
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
   h1 {
     font-family: "Fraunces", Georgia, serif;
     font-weight: 500;
@@ -68,6 +75,30 @@
     margin: 0 0 18px;
     letter-spacing: -0.01em;
   }
+
+  /* ---- Tap timer ---- */
+  .timer-btn {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(34px, 8vw, 46px);
+    line-height: 1.0;
+    letter-spacing: -0.01em;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+    margin: 0 0 18px;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+    flex-shrink: 0;
+  }
+  .timer-btn:hover { color: var(--ink); }
+  .timer-btn.running {
+    color: var(--ember);
+    text-shadow: 0 0 18px rgba(255, 122, 69, 0.35);
+  }
+  .timer-btn:focus-visible { outline: 2px solid var(--cool); outline-offset: 4px; border-radius: 4px; }
 
   .today-bar {
     display: flex;
@@ -291,6 +322,7 @@
   @media (max-width: 420px) {
     .wrap { padding: 32px 14px 60px; }
     .habit { padding: 16px; gap: 4px 12px; }
+    .timer-btn { font-size: clamp(26px, 9vw, 36px); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -302,7 +334,10 @@
   <div class="wrap">
     <header>
       <p class="eyebrow">Day by day</p>
-      <h1>Ritual</h1>
+      <div class="title-row">
+        <h1>Ritual</h1>
+        <button id="timerBtn" class="timer-btn" type="button" aria-label="Tap to start timer, tap again to clear">00:00</button>
+      </div>
       <div class="today-bar">
         <span class="date" id="todayDate"></span>
         <span class="count" id="todayCount"></span>
@@ -327,6 +362,13 @@
       Your habits are saved on this device, in this browser. Export a backup to keep them safe or move them elsewhere.
     </footer>
   </div>
+
+  <!-- Silent looping video used purely to signal to the browser/OS that
+       "media" is playing, which on most mobile browsers prevents the
+       screen from auto-locking while the timer is running. -->
+  <video id="keepAwakeVideo" muted playsinline loop style="position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;">
+    <source src="data:video/mp4;base64,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")>
+  </video>
 
 <script>
 (function () {
@@ -713,6 +755,94 @@
     };
     reader.readAsText(file);
   });
+
+  // ---------- Tap timer (top-right, no buttons — the display IS the button) ----------
+  (function () {
+    var timerBtn = document.getElementById("timerBtn");
+    var keepAwakeVideo = document.getElementById("keepAwakeVideo");
+    var running = false;
+    var startedAt = 0;     // ms timestamp when the current run started
+    var elapsedBase = 0;   // ms accumulated before the current run (we clear on second tap, so this stays 0, but kept for safety)
+    var rafId = null;
+    var wakeLock = null;
+
+    function format(ms) {
+      var totalSeconds = Math.floor(ms / 1000);
+      var mins = Math.floor(totalSeconds / 60);
+      var secs = totalSeconds % 60;
+      return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+    }
+
+    function tick() {
+      var elapsed = elapsedBase + (Date.now() - startedAt);
+      timerBtn.textContent = format(elapsed);
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function requestWakeLock() {
+      if ("wakeLock" in navigator) {
+        navigator.wakeLock.request("screen").then(function (lock) {
+          wakeLock = lock;
+        }).catch(function () {
+          // Wake Lock API unavailable/denied — the hidden looping video
+          // below acts as the fallback to discourage screen lock.
+        });
+      }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release().catch(function () {});
+        wakeLock = null;
+      }
+    }
+
+    function playKeepAwakeVideo() {
+      if (keepAwakeVideo) {
+        var p = keepAwakeVideo.play();
+        if (p && typeof p.catch === "function") p.catch(function () {});
+      }
+    }
+    function pauseKeepAwakeVideo() {
+      if (keepAwakeVideo) keepAwakeVideo.pause();
+    }
+
+    function start() {
+      running = true;
+      startedAt = Date.now();
+      elapsedBase = 0;
+      timerBtn.classList.add("running");
+      timerBtn.setAttribute("aria-label", "Timer running. Tap to clear.");
+      tick();
+      requestWakeLock();
+      playKeepAwakeVideo();
+    }
+
+    function clear() {
+      running = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      elapsedBase = 0;
+      timerBtn.textContent = "00:00";
+      timerBtn.classList.remove("running");
+      timerBtn.setAttribute("aria-label", "Tap to start timer, tap again to clear");
+      releaseWakeLock();
+      pauseKeepAwakeVideo();
+    }
+
+    timerBtn.addEventListener("click", function () {
+      if (!running) start();
+      else clear();
+    });
+
+    // Re-acquire the wake lock if the tab regains visibility mid-run
+    // (the OS/browser revokes it automatically when the tab is hidden).
+    document.addEventListener("visibilitychange", function () {
+      if (running && document.visibilityState === "visible") {
+        requestWakeLock();
+        playKeepAwakeVideo();
+      }
+    });
+  })();
 
   render();
 })();
